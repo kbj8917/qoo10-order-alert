@@ -1,0 +1,59 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Serif+JP:wght@500;700&family=Jost:wght@300;400&family=Cormorant+Garamond:ital,wght@1,500&display=swap">
+<style>
+body{margin:0}
+.cv{width:1000px;height:1000px;position:relative;overflow:hidden;font-family:"Noto Sans JP",sans-serif;color:#3a2427;
+  background:radial-gradient(ellipse 80% 70% at 32% 55%,#fbf1f1 0%,#f4e1e2 55%,#ecd2d5 100%)}
+.smear{position:absolute;border-radius:50%;filter:blur(28px)}
+.brand{font-family:"Jost";font-weight:300;letter-spacing:.42em}
+.en{font-family:"Cormorant Garamond";font-style:italic}
+.pill{display:inline-block;padding:10px 26px;border-radius:99px;font-size:30px;font-weight:700;margin-right:12px}
+</style></head><body>
+<div class="cv" id="cv">
+  <!-- color blur smudges -->
+  <div class="smear" style="left:40px;top:430px;width:520px;height:300px;background:#d47e97;opacity:.55;transform:rotate(-18deg)"></div>
+  <div class="smear" style="left:150px;top:560px;width:420px;height:220px;background:#b9787b;opacity:.45;transform:rotate(-18deg)"></div>
+
+  <!-- product: round bottle + silver dome cap -->
+  <svg style="position:absolute;left:95px;top:190px" width="440" height="760" viewBox="0 0 440 760">
+    <defs>
+      <linearGradient id="cap" x1="0" x2="1"><stop offset="0" stop-color="#8e8e94"/><stop offset=".22" stop-color="#e9e9ee"/><stop offset=".42" stop-color="#ffffff"/><stop offset=".62" stop-color="#c7c7cd"/><stop offset="1" stop-color="#7a7a80"/></linearGradient>
+      <linearGradient id="capTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fafafc"/><stop offset="1" stop-color="#b9b9bf"/></linearGradient>
+      <linearGradient id="ring" x1="0" x2="1"><stop offset="0" stop-color="#6f6f75"/><stop offset=".3" stop-color="#f4f4f7"/><stop offset=".55" stop-color="#a9a9af"/><stop offset=".8" stop-color="#e6e6ea"/><stop offset="1" stop-color="#6a6a70"/></linearGradient>
+      <linearGradient id="body" x1="0" x2="1"><stop offset="0" stop-color="#a95a72"/><stop offset=".28" stop-color="#d9879d"/><stop offset=".5" stop-color="#e59bb0"/><stop offset=".78" stop-color="#c86d87"/><stop offset="1" stop-color="#934960"/></linearGradient>
+      <radialGradient id="shadow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#7a4a52" stop-opacity=".35"/><stop offset="1" stop-color="#7a4a52" stop-opacity="0"/></radialGradient>
+    </defs>
+    <ellipse cx="220" cy="700" rx="200" ry="30" fill="url(#shadow)"/>
+    <!-- body -->
+    <path d="M60 370 Q60 300 140 292 L300 292 Q380 300 380 370 L380 560 Q380 680 260 690 L180 690 Q60 680 60 560 Z" fill="url(#body)"/>
+    <rect x="92" y="330" width="26" height="280" rx="13" fill="#fff" opacity=".38"/>
+    <rect x="128" y="345" width="9" height="240" rx="4.5" fill="#fff" opacity=".22"/>
+    <path d="M342 360 L342 580" stroke="#fff" stroke-opacity=".18" stroke-width="8" stroke-linecap="round"/>
+    <!-- neck ring -->
+    <rect x="96" y="250" width="248" height="52" rx="12" fill="url(#ring)"/>
+    <rect x="96" y="268" width="248" height="8" fill="#5f5f65" opacity=".25"/>
+    <!-- dome cap -->
+    <path d="M60 250 Q60 120 220 104 Q380 120 380 250 Z" fill="url(#cap)"/>
+    <ellipse cx="220" cy="250" rx="160" ry="16" fill="#8a8a90"/>
+    <ellipse cx="220" cy="246" rx="160" ry="14" fill="url(#capTop)" opacity=".6"/>
+    <path d="M110 200 Q130 140 210 126" stroke="#fff" stroke-width="16" fill="none" stroke-linecap="round" opacity=".85"/>
+    <!-- engraved brand -->
+    <text x="220" y="292" text-anchor="middle" font-family="Jost" font-size="15" letter-spacing="6" fill="#55555b" opacity=".75">ODDTYPE</text>
+  </svg>
+
+  <!-- copy -->
+  <div style="position:absolute;left:560px;top:120px;width:400px">
+    <div class="brand" style="font-size:44px">ODDTYPE</div>
+    <div style="font-size:22px;letter-spacing:.2em;color:#9a6b72;margin-top:10px">オッドタイプ</div>
+    <div style="height:2px;width:60px;background:#c47f8f;margin:38px 0 34px"></div>
+    <div style="font-size:60px;font-weight:900;line-height:1.22;letter-spacing:-.01em">スナッグ<br>ブラー<br>ティント</div>
+    <div class="en" style="font-size:30px;color:#b26a7e;margin-top:14px">Snug Blur Tint</div>
+    <div style="font-family:'Noto Serif JP';font-size:34px;font-weight:700;line-height:1.55;margin-top:44px;color:#6b3f48">ふんわり、<br>にじむように<br>色づく唇。</div>
+  </div>
+  <div style="position:absolute;left:560px;top:792px">
+    <span class="pill" style="background:#3a2427;color:#fff">全6色</span><span class="pill" style="background:#fff;color:#b25f76;border:3px solid #d99aab">ブラー質感</span>
+  </div>
+  <div style="position:absolute;left:44px;top:44px;width:150px;height:150px;border-radius:50%;background:#c4677f;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900;font-size:30px;line-height:1.25;box-shadow:0 8px 20px rgba(150,70,90,.25)">NEW<br><span style="font-size:22px;font-weight:700">新作</span></div>
+</div>
+</body></html>
