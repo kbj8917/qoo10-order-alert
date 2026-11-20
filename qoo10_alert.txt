@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Qoo10 Japan 신규 주문 알림 (텔레그램 / 디스코드)
+
+외부 라이브러리 없이 파이썬 3.8+ 표준 라이브러리만 사용합니다.
+
+사용법:
+  python qoo10_alert.txt            # 한 번 확인 (GitHub Actions용)
+  python qoo10_alert.txt --loop     # 계속 실행 (PC용, 기본 3분 간격)
+  python qoo10_alert.txt --test     # API 연결 테스트 (주문 원본 데이터 출력)
+  python qoo10_alert.txt --chat-id  # 텔레그램 chat_id 확인
+"""
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta, timezone
+
+API_BASE = "https://api.qoo10.jp/GMKT.INC.Front.QAPIService/ebayjapan.qapi"
+JST = timezone(timedelta(hours=9))
+
+# ShippingStat: 1=배송대기(入金待ち/配送待ち) 2=배송요청(신규 결제완료) 3=발송확인 4=배송중 5=배송완료
+STATUS_NAMES = {"1": "배송대기", "2": "배송요청(신규)", "3": "발송확인", "4": "배송중", "5": "배송완료"}
+
+
+def env(name, default=""):
+    return os.environ.get(name, default).strip()
+
+
+def load_dotenv(path=".env"):
+    """같은 폴더의 .env 파일을 읽어 환경변수로 설정 (PC 실행용)."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+# ---------------------------------------------------------------- Qoo10 API
+def qapi(method, key, **params):
+    query = {"v": "1.0", "returnType": "json", "method": method, "key": key}
+    query.update({k: v for k, v in params.items() if v is not None})
+    url = f"{API_BASE}?{urllib.parse.urlencode(query)}"
+    req = urllib.request.Request(url, headers={
+        "GiosisCertificationKey": key,
+        "QAPIVersion": "1.0",
+        "User-Agent": "qoo10-order-alert/1.0",
+    })
+    with urllib.request.urlopen(req, timeout=30) as r:
+        body = r.read().decode("utf-8-sig")
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Qoo10 응답을 해석할 수 없습니다: {body[:300]}")
+    code = str(data.get("ResultCode", data.get("resultCode", "0")))
+    if code not in ("0", "-10001"):  # -10001: 조회 결과 없음
+        raise RuntimeError(f"Qoo10 API 오류 [{method}] code={code} msg={data.get('ResultMsg')}")
+    return data
+
+
+def get_seller_key():
+    sak = env("QOO10_SAK")
+    if sak:
+        return sak
+    api_key, uid, pwd = env("QOO10_API_KEY"), env("QOO10_USER_ID"), env("QOO10_PASSWORD")
+    if not (api_key and uid and pwd):
+        sys.exit("설정 오류: QOO10_SAK 또는 (QOO10_API_KEY + QOO10_USER_ID + QOO10_PASSWORD)가 필요합니다.")
+    data = qapi("CertificationAPI.CreateCertificationKey", api_key, user_id=uid, pwd=pwd)
+    sak = data.get("ResultObject")
+    if not sak or not isinstance(sak, str):
+        raise RuntimeError(f"판매자 인증키 발급 실패: {data}")
+    return sak
+
+
+def field(o, *names, default=""):
+    """응답 필드명 대소문자 차이를 흡수."""
+    low = {k.lower(): v for k, v in o.items()}
+    for n in names:
+        v = low.get(n.lower())
+        if v not in (None, ""):
+            return v
+    return default
+
+
+def fetch_orders(sak):
+    days = int(env("LOOKBACK_DAYS", "3") or 3)
+    statuses = [s.strip() for s in env("QOO10_STATUSES", "1,2").split(",") if s.strip()]
+    now = datetime.now(JST)
+    sdate, edate = (now - timedelta(days=days)).strftime("%Y%m%d"), now.strftime("%Y%m%d")
+    orders = {}
+    for st in statuses:
+        data = qapi("ShippingBasic.GetShippingInfo_v2", sak, ShippingStat=st,
+                    search_Sdate=sdate, search_Edate=edate, search_condition="1")
+        for o in data.get("ResultObject") or []:
+            no = str(field(o, "orderNo", "OrderNo"))
+            if no:
+                o["_status"] = st
+                orders[no] = o
+    return orders
+
+
+# ---------------------------------------------------------------- 알림
+def format_order(o):
+    title = field(o, "itemTitle", "ItemTitle")
+    opt = field(o, "option", "Option", "optionCode")
+    qty = field(o, "orderQty", "OrderQty")
+    total = field(o, "total", "Total", "orderPrice", "OrderPrice")
+    lines = [
+        "🛒 Qoo10 신규 주문!",
+        f"주문번호: {field(o, 'orderNo', 'OrderNo')}",
+        f"주문일시: {field(o, 'orderDate', 'OrderDate')}",
+        f"상품: {title}",
+    ]
+    if opt:
+        lines.append(f"옵션: {opt}")
+    lines.append(f"수량: {qty}")
+    if total:
+        lines.append(f"금액: ¥{total}")
+    buyer = field(o, "buyer", "Buyer")
+    if buyer:
+        lines.append(f"구매자: {buyer}")
+    lines.append(f"상태: {STATUS_NAMES.get(o.get('_status'), o.get('_status'))}")
+    return "\n".join(lines)
+
+
+def post(url, payload, as_json=False):
+    if as_json:
+        data, ctype = json.dumps(payload).encode(), "application/json"
+    else:
+        data, ctype = urllib.parse.urlencode(payload).encode(), "application/x-www-form-urlencoded"
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": ctype, "User-Agent": "qoo10-order-alert/1.0"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.read()
+
+
+def notify(text):
+    sent = False
+    tok, chat = env("TELEGRAM_BOT_TOKEN"), env("TELEGRAM_CHAT_ID")
+    if tok and chat:
+        post(f"https://api.telegram.org/bot{tok}/sendMessage", {"chat_id": chat, "text": text})
+        sent = True
+    hook = env("DISCORD_WEBHOOK_URL")
+    if hook:
+        post(hook, {"content": text}, as_json=True)
+        sent = True
+    if not sent:
+        print("[알림 채널 미설정] " + text.replace("\n", " | "))
+
+
+# ---------------------------------------------------------------- 상태 저장
+def load_state(path):
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_state(path, state):
+    # 최근 2000건만 보관
+    state["seen"] = state["seen"][-2000:]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False)
+
+
+def check_once(sak):
+    path = env("STATE_FILE", "seen_orders.json")
+    state = load_state(path)
+    orders = fetch_orders(sak)
+    now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
+    if state is None:
+        # 첫 실행: 기존 주문은 알림 없이 기록만
+        save_state(path, {"seen": list(orders.keys())})
+        notify(f"✅ Qoo10 주문 알림이 시작되었습니다.\n현재 처리 대기 주문: {len(orders)}건\n이제부터 새 주문이 들어오면 알려드릴게요.")
+        print(f"[{now}] 첫 실행 - 기존 주문 {len(orders)}건 기록")
+        return
+    seen = set(state["seen"])
+    new = [o for no, o in orders.items() if no not in seen]
+    for o in sorted(new, key=lambda x: str(field(x, "orderDate", "OrderDate"))):
+        notify(format_order(o))
+        state["seen"].append(str(field(o, "orderNo", "OrderNo")))
+    save_state(path, state)
+    print(f"[{now}] 조회 {len(orders)}건 / 신규 {len(new)}건")
+
+
+def load_actions_secrets():
+    """GitHub Actions: S 환경변수(JSON)에 담긴 Secrets를 환경변수로 풀기."""
+    raw = os.environ.get("S")
+    if not raw:
+        return
+    for k, v in json.loads(raw).items():
+        if isinstance(v, str):
+            os.environ.setdefault(k, v)
+
+
+def commit_state():
+    """GitHub Actions에서 처리한 주문 기록(seen_orders.json)을 저장소에 저장."""
+    if not os.environ.get("GITHUB_ACTIONS"):
+        return
+    import subprocess
+    run = lambda *c: subprocess.run(list(c), check=False)
+    run("git", "config", "user.name", "alert-bot")
+    run("git", "config", "user.email", "alert-bot@users.noreply.github.com")
+    run("git", "add", "seen_orders.json")
+    if subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode != 0:
+        run("git", "commit", "-m", "update seen orders")
+        run("git", "push")
+
+
+def main():
+    load_dotenv()
+    load_actions_secrets()
+    ap = argparse.ArgumentParser(description="Qoo10 Japan 신규 주문 알림")
+    ap.add_argument("--loop", action="store_true", help="계속 실행")
+    ap.add_argument("--interval", type=int, default=int(env("INTERVAL_MINUTES", "3") or 3), help="확인 간격(분)")
+    ap.add_argument("--test", action="store_true", help="API 연결 테스트")
+    ap.add_argument("--chat-id", action="store_true", help="텔레그램 chat_id 확인")
+    a = ap.parse_args()
+
+    if a.chat_id:
+        tok = env("TELEGRAM_BOT_TOKEN") or sys.exit("TELEGRAM_BOT_TOKEN을 먼저 설정하세요.")
+        with urllib.request.urlopen(f"https://api.telegram.org/bot{tok}/getUpdates", timeout=30) as r:
+            res = json.load(r).get("result", [])
+        ids = {u["message"]["chat"]["id"]: u["message"]["chat"].get("first_name", "") for u in res if "message" in u}
+        if not ids:
+            print("메시지가 없습니다. 텔레그램에서 내 봇에게 아무 메시지나 보낸 후 다시 실행하세요.")
+        for i, n in ids.items():
+            print(f"chat_id = {i}  ({n})")
+        return
+
+    sak = get_seller_key()
+    if a.test:
+        orders = fetch_orders(sak)
+        print(f"✅ API 연결 성공 - 조회된 주문 {len(orders)}건")
+        for o in list(orders.values())[:3]:
+            print(json.dumps(o, ensure_ascii=False, indent=2))
+        notify("🔔 Qoo10 주문 알림 테스트 메시지입니다.")
+        return
+
+    if not a.loop:
+        try:
+            check_once(sak)
+        finally:
+            commit_state()
+        return
+    print(f"모니터링 시작 ({a.interval}분 간격, 종료: Ctrl+C)")
+    while True:
+        try:
+            check_once(sak)
+        except Exception as e:  # 네트워크 오류 등은 다음 주기에 재시도
+            print(f"오류: {e}")
+            if "인증" in str(e) or "-1" in str(e):
+                try:
+                    sak = get_seller_key()
+                except Exception:
+                    pass
+        time.sleep(a.interval * 60)
+
+
+if __name__ == "__main__":
+    main()
