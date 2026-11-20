@@ -1,0 +1,38 @@
+name: qoo10-upload
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "jobs/ 폴더의 작업 ID (비우면 카테고리/배송비 목록 동기화)"
+        required: false
+        default: ""
+permissions:
+  contents: write
+concurrency:
+  group: qoo10-upload
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 실행
+        env:
+          S: ${{ toJSON(secrets) }}
+          JOB: ${{ inputs.job }}
+        run: |
+          if [ -n "$JOB" ]; then
+            case "$JOB" in *[!A-Za-z0-9_-]*) echo "잘못된 작업 ID"; exit 1;; esac
+            python qoo10_upload.py --job "jobs/$JOB.json"
+          else
+            python qoo10_upload.py --sync
+          fi
+      - name: 결과 저장
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results docs/data 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "qoo10 upload result ${{ inputs.job }}"
+          for i in 1 2 3 4; do git pull --rebase && git push && exit 0; sleep 5; done
+          exit 1

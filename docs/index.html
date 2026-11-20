@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e8173c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Qoo10 등록">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Qoo10 등록·갈이</title>
+<style>
+:root{--red:#e8173c;--bg:#f5f5f7;--card:#fff;--tx:#1c1c1e;--sub:#6e6e73;--line:#e0e0e5;--ok:#1a9e55}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--tx:#f2f2f7;--sub:#9a9aa0;--line:#38383c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;height:calc(52px + env(safe-area-inset-top));z-index:5;background:var(--red);color:#fff;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:18px;margin:0}
+header button{background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:8px;padding:6px 10px;font-size:14px}
+main{max-width:640px;margin:0 auto;padding:12px 16px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 10px;color:var(--sub);font-weight:600}
+label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+label:first-of-type{margin-top:0}
+input,textarea,select{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+textarea{min-height:110px;resize:vertical}
+.row{display:flex;gap:10px}.row>div{flex:1;min-width:0}
+.req::after{content:" *";color:var(--red)}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-family:inherit;font-size:16px;font-weight:600;background:var(--red);color:#fff}
+.btn.sub{background:var(--bg);color:var(--tx);border:1px solid var(--line);font-weight:500;padding:10px}
+.btn:disabled{opacity:.5}
+.photos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ph{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--line)}
+.ph img{width:100%;height:100%;object-fit:cover}
+.ph .x{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:12px;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:24px;padding:0}
+.ph .tag{position:absolute;left:0;bottom:0;right:0;background:var(--red);color:#fff;font-size:11px;text-align:center}
+.add{display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--sub);aspect-ratio:1;border-radius:10px;border:2px dashed var(--line)}
+.hint{font-size:12px;color:var(--sub);margin-top:6px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.bar .btn{max-width:608px;margin:0 auto}
+.list{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:6px;display:none}
+.list div{padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px}
+.list div:active{background:var(--bg)}
+.chosen{font-size:13px;color:var(--ok);margin-top:4px}
+.job{border-top:1px solid var(--line);padding:10px 0;font-size:14px}
+.job:first-of-type{border-top:0}
+.st{display:inline-block;font-size:12px;border-radius:6px;padding:1px 7px;margin-right:6px;background:var(--bg)}
+.st.ok{background:var(--ok);color:#fff}.st.err{background:var(--red);color:#fff}
+.err-msg{color:var(--red);font-size:13px;word-break:break-all}
+dialog{border:0;border-radius:16px;width:min(92vw,520px);background:var(--card);color:var(--tx);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+#toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;display:none;max-width:90vw;z-index:20}
+#progress{white-space:pre-line;font-size:14px}
+.tabs{display:flex;background:var(--red);padding:0 16px 8px;gap:6px;position:sticky;top:calc(52px + env(safe-area-inset-top));z-index:5}
+.tabs button{flex:1;border:0;border-radius:10px;padding:9px;font:inherit;font-size:15px;background:rgba(255,255,255,.18);color:#fff}
+.tabs button.on{background:#fff;color:var(--red);font-weight:700}
+.hidden{display:none!important}
+.item{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line);align-items:flex-start}
+.item:first-child{border-top:0}
+.item input[type=checkbox]{width:22px;height:22px;flex:none;margin-top:4px}
+.item .th{width:56px;height:56px;border-radius:8px;object-fit:cover;flex:none;background:var(--bg)}
+.item .body{flex:1;min-width:0}
+.item .t{font-size:14px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item .m{font-size:12px;color:var(--sub);margin-top:2px}
+.item .edit{margin-top:8px;display:none}
+.item.sel .edit{display:block}
+.item .edit input{padding:7px 10px;font-size:14px;margin-bottom:6px}
+.pill{display:inline-block;font-size:11px;border-radius:5px;padding:0 5px;background:var(--bg);margin-right:4px}
+.pill.zero{background:#ffe3e8;color:var(--red)}
+@media (prefers-color-scheme:dark){.pill.zero{background:#4a1520;color:#ff8da1}}
+details summary{cursor:pointer;color:var(--sub);font-size:14px}
+</style>
+</head>
+<body>
+<header><h1>Qoo10 등록·갈이</h1><button id="openSettings">⚙︎ 설정</button></header>
+<nav class="tabs"><button id="tabBtnNew" class="on">신규 등록</button><button id="tabBtnRe">페이지 갈이</button></nav>
+<main>
+<section id="tabRe" class="hidden">
+  <div class="card">
+    <h2>1. 판매 부진 상품 찾기</h2>
+    <div class="row">
+      <div><label>판매 집계 기간 (일)</label><input id="reDays" type="number" inputmode="numeric" value="30"></div>
+      <div><label>등록 후 최소 경과일</label><input id="reAge" type="number" inputmode="numeric" value="30"></div>
+    </div>
+    <div class="row">
+      <div><label>판매수량 이하</label><input id="reSold" type="number" inputmode="numeric" value="0"></div>
+      <div><label>조회수 이하 (CSV 있을 때)</label><input id="rePv" type="number" inputmode="numeric" value="10"></div>
+    </div>
+    <label>QSM 조회수 CSV (선택)</label>
+    <input type="file" id="pvFile" accept=".csv,text/csv,text/plain">
+    <div class="hint" id="pvInfo">QSM → 統計 → 商品分析에서 받은 CSV. 상품번호·조회수(閲覧数/PV) 열을 자동으로 찾아요.</div>
+    <div style="height:12px"></div>
+    <button class="btn sub" id="scanBtn">🔍 판매중 상품 스캔 (1~3분)</button>
+    <div class="hint" id="scanInfo"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. 갈이할 상품 선택·수정 <span id="candCount"></span></h2>
+    <div class="row" style="margin-bottom:8px">
+      <div><button class="btn sub" id="selAll" style="padding:7px">전체 선택</button></div>
+      <div><button class="btn sub" id="selNone" style="padding:7px">선택 해제</button></div>
+    </div>
+    <details style="margin-bottom:8px"><summary>선택 상품 제목 일괄 수정</summary>
+      <label>앞에 붙일 문구 (기존 【…】 문구는 교체)</label>
+      <input id="bulkPrefix" placeholder="예: 【新作】">
+      <label>뒤에 붙일 문구</label>
+      <input id="bulkSuffix" placeholder="예: 送料無料">
+      <label>가격 조정 (%)</label>
+      <input id="bulkPct" type="number" inputmode="decimal" placeholder="예: -5">
+      <div style="height:8px"></div>
+      <button class="btn sub" id="bulkApply" style="padding:8px">선택 상품에 적용</button>
+    </details>
+    <div id="cands"><div class="hint">스캔하면 여기에 후보가 나와요.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>3. 실행</h2>
+    <label>기존 상품 처리</label>
+    <select id="oldAction"><option value="1">판매중지 (取引待機 · 나중에 되살리기 가능)</option><option value="3">거래폐지 (取引廃止)</option></select>
+    <div class="hint">기존 상품을 먼저 내리고 새로 등록해요(중복 출품 방지). 새 등록이 실패하면 기존 상품을 자동으로 되살려요. 옵션이 있는 상품은 옵션이 복사되지 않아서 자동으로 제외돼요.</div>
+    <div style="height:12px"></div>
+    <div class="row">
+      <div><button class="btn sub" id="reDry">미리보기 (실제 등록 안 함)</button></div>
+      <div><button class="btn" id="reRun">페이지 갈이 실행</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>결과</h2>
+    <div id="reResult"><div class="hint">아직 없어요.</div></div>
+  </div>
+</section>
+<section id="tabNew">
+  <div class="card">
+    <h2>사진</h2>
+    <div class="photos" id="photos"></div>
+    <input type="file" id="fileIn" accept="image/*" multiple hidden>
+    <input type="file" id="reImgIn" accept="image/*" hidden>
+    <div class="hint">첫 번째 사진이 대표 이미지예요. 사진을 눌러 대표로 지정할 수 있어요.</div>
+    <label style="margin-top:14px">상세페이지 이미지 (선택)</label>
+    <div class="photos" id="dphotos"></div>
+    <input type="file" id="dfileIn" accept="image/*" multiple hidden>
+  </div>
+
+  <div class="card">
+    <h2>기본 정보</h2>
+    <label class="req">상품명</label>
+    <input id="title" maxlength="100" placeholder="例) 【公式】韓国コスメ ○○ クリーム 50ml">
+    <div class="hint"><span id="titleLen">0</span>/100자 · 일본어 권장</div>
+    <label class="req">카테고리</label>
+    <input id="catSearch" placeholder="검색 (예: 化粧水, クリーム) 또는 소분류 코드 입력">
+    <div class="list" id="catList"></div>
+    <div class="chosen" id="catChosen"></div>
+    <div class="row">
+      <div><label class="req">판매가 (¥)</label><input id="price" type="number" inputmode="numeric" min="1"></div>
+      <div><label>정가 (¥)</label><input id="retail" type="number" inputmode="numeric" min="0"></div>
+    </div>
+    <div class="row">
+      <div><label class="req">재고 수량</label><input id="qty" type="number" inputmode="numeric" min="1" value="100"></div>
+      <div><label class="req">판매자 상품코드</label><input id="sellerCode" placeholder="자동 생성"></div>
+    </div>
+    <label class="req">배송비 템플릿</label>
+    <select id="shipping"><option value="">설정에서 목록을 불러오세요</option></select>
+  </div>
+
+  <div class="card">
+    <h2>상세 설명</h2>
+    <textarea id="desc" placeholder="상품 설명 (줄바꿈 그대로 반영, HTML도 가능)"></textarea>
+    <label>검색 키워드</label>
+    <input id="keyword" placeholder="쉼표로 구분 (예: 韓国コスメ,保湿)">
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>추가 옵션</summary>
+      <div class="row">
+        <div><label>원산지</label><input id="origin" value="Korea"></div>
+        <div><label>원산지 구분</label><select id="originType"><option value="2">해외</option><option value="1">일본 국내</option><option value="3">기타</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>JAN 코드</label><input id="jan" inputmode="numeric"></div>
+        <div><label>브랜드 번호</label><input id="brand" inputmode="numeric"></div>
+      </div>
+      <div class="row">
+        <div><label>무게 (kg)</label><input id="weight" type="number" step="0.01" inputmode="decimal"></div>
+        <div><label>발송 소요일</label><input id="availDays" type="number" inputmode="numeric" value="3"></div>
+      </div>
+      <label>성인 상품</label>
+      <select id="adult"><option value="N">아니오</option><option value="Y">예</option></select>
+      <label>추가 API 파라미터 (JSON, 고급)</label>
+      <textarea id="extra" style="min-height:60px" placeholder='{"PromotionName":"本日発送"}'></textarea>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>최근 등록 <button class="btn sub" id="refreshJobs" style="display:inline;width:auto;padding:2px 10px;font-size:12px;float:right">새로고침</button></h2>
+    <div id="jobs"><div class="hint">아직 없어요.</div></div>
+  </div>
+</section>
+</main>
+<div class="bar" id="newBar"><button class="btn" id="submit">Qoo10에 등록하기</button></div>
+<div id="toast"></div>
+
+<dialog id="settings">
+  <h2 style="margin-top:0">설정</h2>
+  <label>GitHub 토큰</label>
+  <input id="sToken" type="password" placeholder="github_pat_...">
+  <div class="hint">이 저장소에 <b>Contents: Read and write</b>, <b>Actions: Read and write</b> 권한이 있는 Fine-grained 토큰. 이 폰에만 저장돼요.</div>
+  <label>저장소</label>
+  <input id="sRepo" placeholder="kbj8917/qoo10-order-alert">
+  <label>브랜치</label>
+  <input id="sBranch" placeholder="main">
+  <label>상품코드 접두어</label>
+  <input id="sPrefix" placeholder="KB">
+  <div style="height:14px"></div>
+  <button class="btn sub" id="syncBtn">카테고리·배송비 목록 Qoo10에서 불러오기</button>
+  <div class="hint" id="syncInfo"></div>
+  <div style="height:10px"></div>
+  <div class="row"><div><button class="btn sub" id="closeSettings">닫기</button></div><div><button class="btn" id="saveSettings">저장</button></div></div>
+</dialog>
+
+<dialog id="progDlg">
+  <h2 style="margin-top:0">등록 중…</h2>
+  <div id="progress"></div>
+  <div style="height:14px"></div>
+  <button class="btn sub" id="progClose">닫기 (백그라운드에서 계속 진행)</button>
+</dialog>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+const guessRepo = () => {
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+  const p = location.pathname.split("/").filter(Boolean)[0];
+  return m && p ? `${m[1]}/${p}` : "kbj8917/qoo10-order-alert";
+};
+let cfg = Object.assign({ token: "", repo: guessRepo(), branch: "main", prefix: "KB" }, store.get("cfg", {}));
+let photos = [], dphotos = [];   // {blob, url}
+let categories = [], category = store.get("lastCat", null);
+
+function toast(msg, ms = 2600) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = "none", ms); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------------------------------------------------------------- GitHub API
+async function gh(path, opt = {}) {
+  if (!cfg.token) throw new Error("설정에서 GitHub 토큰을 먼저 입력하세요.");
+  const r = await fetch(`https://api.github.com/repos/${cfg.repo}${path}`, {
+    ...opt,
+    headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(opt.headers || {}) },
+    cache: "no-store"
+  });
+  if (r.status === 404 && opt.allow404) return null;
+  if (!r.ok) { const t = await r.text(); throw new Error(`GitHub ${r.status}: ${t.slice(0, 200)}`); }
+  return r.status === 204 ? null : r.json();
+}
+async function putFile(path, b64, message) {
+  return gh(`/contents/${path}`, { method: "PUT", body: JSON.stringify({ message, content: b64, branch: cfg.branch }) });
+}
+async function readJson(path) {
+  if (!cfg.token) throw new Error("설정에서 GitHub 토큰을 먼저 입력하세요.");
+  const r = await fetch(`https://api.github.com/repos/${cfg.repo}/contents/${path}?ref=${cfg.branch}&t=${Date.now()}`, {
+    headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github.raw+json" }, cache: "no-store" });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`GitHub ${r.status}`);
+  return r.json();
+}
+async function dispatch(job) {
+  return gh(`/actions/workflows/upload.yml/dispatches`, { method: "POST", body: JSON.stringify({ ref: cfg.branch, inputs: { job } }) });
+}
+const rawUrl = p => `https://raw.githubusercontent.com/${cfg.repo}/${cfg.branch}/${p}`;
+const toB64 = s => btoa(unescape(encodeURIComponent(s)));
+const blobB64 = b => new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result.split(",")[1]); fr.onerror = no; fr.readAsDataURL(b); });
+
+// ---------------------------------------------------------------- 사진
+async function compress(file, max = 1200) {
+  const img = await createImageBitmap(file).catch(() => null);
+  if (!img) return file;
+  const s = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+  const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(r, "image/jpeg", 0.88));
+}
+function renderPhotos(el, arr, inputId, main) {
+  el.innerHTML = "";
+  arr.forEach((p, i) => {
+    const d = document.createElement("div"); d.className = "ph";
+    d.innerHTML = `<img src="${p.url}">${main && i === 0 ? '<div class="tag">대표</div>' : ""}<button class="x">✕</button>`;
+    d.querySelector(".x").onclick = e => { e.stopPropagation(); URL.revokeObjectURL(p.url); arr.splice(i, 1); renderPhotos(el, arr, inputId, main); };
+    if (main) d.onclick = () => { arr.unshift(arr.splice(i, 1)[0]); renderPhotos(el, arr, inputId, main); };
+    el.appendChild(d);
+  });
+  const a = document.createElement("div"); a.className = "add"; a.textContent = "+";
+  a.onclick = () => $(inputId).click(); el.appendChild(a);
+}
+async function addFiles(files, arr, el, inputId, main) {
+  for (const f of files) { const blob = await compress(f, main ? 1200 : 1000); arr.push({ blob, url: URL.createObjectURL(blob) }); }
+  renderPhotos(el, arr, inputId, main);
+}
+$("fileIn").onchange = e => { addFiles([...e.target.files], photos, $("photos"), "fileIn", true); e.target.value = ""; };
+$("dfileIn").onchange = e => { addFiles([...e.target.files], dphotos, $("dphotos"), "dfileIn", false); e.target.value = ""; };
+renderPhotos($("photos"), photos, "fileIn", true);
+renderPhotos($("dphotos"), dphotos, "dfileIn", false);
+
+// ---------------------------------------------------------------- 카테고리 / 배송비
+async function loadLists() {
+  try { const r = await fetch(`data/categories.json?t=${Date.now()}`); if (r.ok) categories = await r.json(); } catch {}
+  try {
+    const r = await fetch(`data/shipping.json?t=${Date.now()}`);
+    if (r.ok) {
+      fillShipping(await r.json());
+    }
+  } catch {}
+  try { const r = await fetch(`data/sync.json?t=${Date.now()}`); if (r.ok) { const s = await r.json(); $("syncInfo").textContent = `마지막 동기화: ${s.synced_at}` + (s.errors.length ? " · 오류: " + s.errors.join(" / ") : ""); } } catch {}
+}
+function fillShipping(list) {
+  const sel = $("shipping"), last = store.get("lastShip", ""), esc = x => String(x ?? "").replace(/[&<>"]/g, "");
+  sel.innerHTML = '<option value="">선택하세요</option>' + list.map(s => `<option value="${esc(s.no)}">${esc(s.name) || "배송비"} (${esc(s.no)})${s.fee !== "" ? " ¥" + esc(s.fee) : ""}</option>`).join("");
+  if (last) sel.value = last;
+}
+function showCat() { $("catChosen").textContent = category ? `✓ ${category.n} (${category.c})` : ""; }
+$("catSearch").oninput = () => {
+  const q = $("catSearch").value.trim(), list = $("catList");
+  if (/^\d{6,}$/.test(q)) { category = categories.find(c => c.c === q) || { c: q, n: "직접 입력한 코드" }; showCat(); list.style.display = "none"; return; }
+  if (q.length < 1) { list.style.display = "none"; return; }
+  const ql = q.toLowerCase(), hits = categories.filter(c => c.n.toLowerCase().includes(ql)).slice(0, 60);
+  list.innerHTML = hits.length ? "" : '<div class="hint">결과 없음 — 설정에서 목록을 불러오거나 코드를 직접 입력하세요</div>';
+  hits.forEach(c => { const d = document.createElement("div"); d.textContent = c.n; d.onclick = () => { category = c; store.set("lastCat", c); showCat(); list.style.display = "none"; $("catSearch").value = ""; }; list.appendChild(d); });
+  list.style.display = "block";
+};
+showCat();
+
+$("title").oninput = () => $("titleLen").textContent = $("title").value.length;
+
+// ---------------------------------------------------------------- 설정
+function fillSettings() { $("sToken").value = cfg.token; $("sRepo").value = cfg.repo; $("sBranch").value = cfg.branch; $("sPrefix").value = cfg.prefix; }
+$("openSettings").onclick = () => { fillSettings(); $("settings").showModal(); };
+$("closeSettings").onclick = () => $("settings").close();
+$("saveSettings").onclick = () => {
+  cfg = { token: $("sToken").value.trim(), repo: $("sRepo").value.trim() || guessRepo(), branch: $("sBranch").value.trim() || "main", prefix: $("sPrefix").value.trim() };
+  store.set("cfg", cfg); $("settings").close(); toast("저장했어요"); refreshJobs();
+};
+$("syncBtn").onclick = async () => {
+  $("saveSettings").click();
+  try {
+    const prev = await readJson("docs/data/sync.json").catch(() => null);
+    const prevAt = prev && prev.synced_at;
+    await dispatch(""); toast("동기화 시작 — 1~2분 걸려요", 4000);
+    $("syncInfo").textContent = "동기화 중…";
+    for (let i = 0; i < 40; i++) {
+      await sleep(8000);
+      const s = await readJson("docs/data/sync.json").catch(() => null);
+      if (s && s.synced_at && s.synced_at !== prevAt) {
+        // GitHub Pages 반영 전이라도 API로 직접 읽어서 바로 적용
+        const cats = await readJson("docs/data/categories.json").catch(() => null);
+        if (cats) categories = cats;
+        const ships = await readJson("docs/data/shipping.json").catch(() => null);
+        if (ships) fillShipping(ships);
+        $("syncInfo").textContent = `동기화 완료: ${s.synced_at}` + (s.errors.length ? " · 오류: " + s.errors.join(" / ") : "");
+        toast(`카테고리 ${categories.length}개 · 배송비 ${ships ? ships.length : 0}개 불러옴`);
+        return;
+      }
+    }
+    $("syncInfo").textContent = "시간 초과 — GitHub Actions 탭에서 실행 로그를 확인하세요.";
+  } catch (e) { toast(e.message, 5000); $("syncInfo").textContent = e.message; }
+};
+
+// ---------------------------------------------------------------- 등록
+function newId() {
+  const d = new Date(Date.now() + 9 * 3600e3).toISOString().replace(/\D/g, "").slice(2, 14);
+  return d + "-" + Math.random().toString(36).slice(2, 6);
+}
+function setProg(lines) { $("progress").textContent = lines.join("\n"); }
+
+$("submit").onclick = async () => {
+  const v = id => $(id).value.trim();
+  const errs = [];
+  if (!photos.length) errs.push("사진");
+  if (!v("title")) errs.push("상품명");
+  if (!category) errs.push("카테고리");
+  if (!(+v("price") > 0)) errs.push("판매가");
+  if (!(+v("qty") > 0)) errs.push("재고");
+  if (!v("shipping")) errs.push("배송비 템플릿");
+  let extra = {};
+  if (v("extra")) { try { extra = JSON.parse(v("extra")); } catch { errs.push("추가 파라미터(JSON 형식 오류)"); } }
+  if (errs.length) return toast("입력 필요: " + errs.join(", "), 4000);
+  if (!cfg.token) { fillSettings(); $("settings").showModal(); return toast("GitHub 토큰을 먼저 설정하세요"); }
+
+  const id = newId();
+  const sellerCode = v("sellerCode") || `${cfg.prefix}${id.replace("-", "").slice(0, 14)}`.toUpperCase();
+  const lines = [];
+  const step = s => { lines.push(s); setProg(lines); };
+  $("submit").disabled = true; $("progDlg").showModal();
+  try {
+    const dir = `uploads/${id}`;
+    const imgs = [], dimgs = [];
+    for (let i = 0; i < photos.length; i++) {
+      step(`📷 사진 업로드 ${i + 1}/${photos.length}`);
+      const p = `${dir}/${i + 1}.jpg`; await putFile(p, await blobB64(photos[i].blob), `photo ${id}`); imgs.push(rawUrl(p));
+    }
+    for (let i = 0; i < dphotos.length; i++) {
+      step(`🖼 상세 이미지 업로드 ${i + 1}/${dphotos.length}`);
+      const p = `${dir}/d${i + 1}.jpg`; await putFile(p, await blobB64(dphotos[i].blob), `detail ${id}`); dimgs.push(rawUrl(p));
+    }
+    const job = {
+      title: v("title"), category: category.c, category_name: category.n,
+      price: +v("price"), retail_price: v("retail") ? +v("retail") : null, qty: +v("qty"),
+      seller_code: sellerCode, shipping_no: v("shipping"),
+      description: $("desc").value, keyword: v("keyword"),
+      origin: v("origin") || "Korea", origin_type: v("originType"), jan: v("jan"), brand_no: v("brand"),
+      weight: v("weight"), available_value: v("availDays") || "3", adult: v("adult"),
+      images: imgs, detail_images: dimgs, extra, created_at: new Date().toISOString()
+    };
+    step("📝 상품 정보 저장");
+    await putFile(`jobs/${id}.json`, toB64(JSON.stringify(job, null, 2)), `job ${id}`);
+    store.set("lastShip", v("shipping"));
+    const hist = store.get("jobs", []); hist.unshift({ id, title: job.title, price: job.price, at: Date.now() }); store.set("jobs", hist.slice(0, 30));
+    step("🚀 Qoo10 등록 요청 (보통 30초~1분)");
+    await dispatch(id);
+    resetForm();
+    const res = await waitResult(id, step);
+    if (res && res.ok) step(`\n✅ 등록 완료!\n상품번호: ${res.item_code || "(응답 확인 필요)"}` + (res.warnings && res.warnings.length ? "\n⚠️ " + res.warnings.join("\n⚠️ ") : ""));
+    else if (res) step(`\n❌ 등록 실패\n${res.error}`);
+    else step("\n⏳ 아직 처리 중이에요. 잠시 후 '최근 등록'에서 확인하세요.");
+  } catch (e) { step(`\n❌ 오류: ${e.message}`); }
+  finally { $("submit").disabled = false; refreshJobs(); }
+};
+async function waitResult(id, step, prevAt) {
+  for (let i = 0; i < 45; i++) {
+    await sleep(i < 3 ? 10000 : 6000);
+    const r = await readJson(`results/${id}.json`).catch(() => null);
+    if (r && r.finished_at !== prevAt) return r;
+    if (step && i % 5 === 4) step("… 처리 중");
+  }
+  return null;
+}
+function resetForm() {
+  photos.forEach(p => URL.revokeObjectURL(p.url)); dphotos.forEach(p => URL.revokeObjectURL(p.url));
+  photos = []; dphotos = [];
+  renderPhotos($("photos"), photos, "fileIn", true); renderPhotos($("dphotos"), dphotos, "dfileIn", false);
+  ["title", "price", "retail", "sellerCode", "desc", "keyword", "jan", "extra"].forEach(k => $(k).value = "");
+  $("titleLen").textContent = "0";
+}
+$("progClose").onclick = () => $("progDlg").close();
+
+// ---------------------------------------------------------------- 최근 등록
+async function refreshJobs() {
+  const hist = store.get("jobs", []), el = $("jobs");
+  if (!hist.length) { el.innerHTML = '<div class="hint">아직 없어요.</div>'; return; }
+  el.innerHTML = "";
+  for (const h of hist.slice(0, 10)) {
+    const d = document.createElement("div"); d.className = "job";
+    const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const render = r => {
+      const st = !r ? '<span class="st">처리 중</span>' : r.ok ? '<span class="st ok">완료</span>' : '<span class="st err">실패</span>';
+      d.innerHTML = `${st}<b>${esc(h.title)}</b> · ¥${h.price}<div class="hint">${new Date(h.at).toLocaleString("ko-KR")}${r && r.item_code ? " · 상품번호 " + esc(r.item_code) : ""}</div>` +
+        (r && !r.ok ? `<div class="err-msg">${esc(r.error)}</div><button class="btn sub" style="margin-top:6px;padding:6px">다시 시도</button>` : "");
+      const b = d.querySelector("button");
+      if (b) b.onclick = async () => { try { const prevAt = r.finished_at; await dispatch(h.id); toast("다시 요청했어요"); render(null); const nr = await waitResult(h.id, null, prevAt); if (nr) render(nr); } catch (e) { toast(e.message); } };
+    };
+    render(null); el.appendChild(d);
+    if (cfg.token) readJson(`results/${h.id}.json`).then(render).catch(() => {});
+  }
+}
+$("refreshJobs").onclick = refreshJobs;
+
+
+// ---------------------------------------------------------------- 탭
+function showTab(t) {
+  $("tabNew").classList.toggle("hidden", t !== "new"); $("tabRe").classList.toggle("hidden", t !== "re");
+  $("newBar").classList.toggle("hidden", t !== "new");
+  $("tabBtnNew").classList.toggle("on", t === "new"); $("tabBtnRe").classList.toggle("on", t === "re");
+  document.body.style.paddingBottom = t === "new" ? "" : "24px";
+  store.set("tab", t);
+}
+$("tabBtnNew").onclick = () => showTab("new"); $("tabBtnRe").onclick = () => showTab("re");
+showTab(store.get("tab", "new"));
+
+// ---------------------------------------------------------------- 페이지 갈이
+const escH = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let scanData = store.get("scan", null), pvMap = {}, edits = {}, reImgTarget = null;
+
+async function runJob(job, onTick) {
+  const id = (job.type === "scan" ? "scan-" : "relist-") + newId();
+  await putFile(`jobs/${id}.json`, toB64(JSON.stringify(job, null, 2)), `${job.type} ${id}`);
+  await dispatch(id);
+  for (let i = 0; i < 80; i++) {
+    await sleep(i < 3 ? 12000 : 6000);
+    const r = await readJson(`results/${id}.json`).catch(() => null);
+    if (r) return r;
+    onTick && onTick(i);
+  }
+  throw new Error("시간 초과 — GitHub 저장소의 Actions 탭에서 qoo10-upload 로그를 확인하세요.");
+}
+
+// CSV (Shift_JIS / UTF-8 자동)
+function parseCsv(text) {
+  const rows = [], re = /("([^"]|"")*"|[^,\r\n]*)(,|\r?\n|$)/g; let row = [], m;
+  while ((m = re.exec(text)) && m[0] !== "") {
+    let v = m[1]; if (v.startsWith('"')) v = v.slice(1, -1).replace(/""/g, '"');
+    row.push(v.trim()); if (m[3] !== ",") { rows.push(row); row = []; }
+  }
+  if (row.length) rows.push(row);
+  return rows;
+}
+$("pvFile").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const buf = await f.arrayBuffer();
+  let text = new TextDecoder("utf-8").decode(buf);
+  if (text.includes("�")) text = new TextDecoder("shift_jis").decode(buf);
+  const rows = parseCsv(text.replace(/^﻿/, ""));
+  let hi = rows.findIndex(r => r.some(c => /商品番号|商品コード|상품번호|ItemCode|item\s*code|GdNo/i.test(c)));
+  if (hi < 0) { $("pvInfo").textContent = "❌ 상품번호 열을 찾지 못했어요."; return; }
+  const h = rows[hi];
+  const ci = h.findIndex(c => /商品番号|商品コード|상품번호|ItemCode|item\s*code|GdNo/i.test(c));
+  const pi = h.findIndex(c => /閲覧|PV|ページビュー|조회|view|訪問|アクセス/i.test(c));
+  if (pi < 0) { $("pvInfo").textContent = "❌ 조회수 열을 찾지 못했어요. 열 이름: " + h.join(", "); return; }
+  pvMap = {};
+  for (const r of rows.slice(hi + 1)) { const c = (r[ci] || "").replace(/\D/g, ""); if (c) pvMap[c] = (pvMap[c] || 0) + (parseFloat((r[pi] || "0").replace(/,/g, "")) || 0); }
+  $("pvInfo").textContent = `✓ ${Object.keys(pvMap).length}개 상품 조회수 불러옴 (열: ${h[ci]} / ${h[pi]})`;
+  renderCands();
+};
+
+$("scanBtn").onclick = async () => {
+  const b = $("scanBtn"); b.disabled = true;
+  $("scanInfo").textContent = "스캔 요청 중…";
+  try {
+    const r = await runJob({ type: "scan", days: +$("reDays").value || 30 }, i => $("scanInfo").textContent = `스캔 중… (${(i + 3) * 6}초)`);
+    if (!r.ok) throw new Error(r.error);
+    scanData = { at: r.finished_at, days: r.days, items: r.items }; store.set("scan", scanData);
+    $("scanInfo").textContent = `✓ ${r.finished_at} · 판매중 ${r.item_count}개 · 최근 ${r.days}일 판매된 상품 ${r.sold_items}개`;
+    edits = {}; renderCands();
+  } catch (e) { $("scanInfo").textContent = "❌ " + e.message; }
+  finally { b.disabled = false; }
+};
+["reAge", "reSold", "rePv"].forEach(k => $(k).oninput = () => renderCands());
+
+function candidates() {
+  if (!scanData) return [];
+  const age = +$("reAge").value || 0, maxSold = +$("reSold").value || 0, maxPv = +$("rePv").value || 0, hasPv = Object.keys(pvMap).length > 0;
+  const now = Date.now();
+  return scanData.items.filter(it => {
+    if (it.sold > maxSold) return false;
+    if (hasPv && (pvMap[it.code] || 0) > maxPv) return false;
+    if (age && it.reg_date) { const d = Date.parse(it.reg_date.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")); if (d && now - d < age * 864e5) return false; }
+    return true;
+  }).sort((a, b) => (pvMap[a.code] || 0) - (pvMap[b.code] || 0));
+}
+function renderCands() {
+  if (scanData && !$("scanInfo").textContent) $("scanInfo").textContent = `마지막 스캔: ${scanData.at} (최근 ${scanData.days}일 기준)`;
+  const list = candidates(), el = $("cands"), hasPv = Object.keys(pvMap).length > 0;
+  $("candCount").textContent = scanData ? `· 후보 ${list.length}개 / 선택 ${Object.values(edits).filter(e => e.sel).length}개` : "";
+  if (!scanData) return;
+  if (!list.length) { el.innerHTML = '<div class="hint">조건에 맞는 상품이 없어요.</div>'; return; }
+  el.innerHTML = "";
+  for (const it of list.slice(0, 200)) {
+    const e = edits[it.code] || (edits[it.code] = { sel: false, title: it.title, price: it.price, image: "" });
+    const d = document.createElement("div"); d.className = "item" + (e.sel ? " sel" : "");
+    d.innerHTML = `<input type="checkbox" ${e.sel ? "checked" : ""}>
+      <img class="th" src="${escH(e.image || it.image)}" onerror="this.style.visibility='hidden'">
+      <div class="body"><div class="t">${escH(it.title)}</div>
+        <div class="m"><span class="pill ${it.sold ? "" : "zero"}">판매 ${it.sold}</span>${hasPv ? `<span class="pill ${pvMap[it.code] ? "" : "zero"}">조회 ${pvMap[it.code] || 0}</span>` : ""}¥${escH(it.price)} · ${escH(it.code)}${it.reg_date ? " · " + escH(it.reg_date) : ""}</div>
+        <div class="edit">
+          <input class="et" value="${escH(e.title)}" maxlength="100" placeholder="새 제목">
+          <div class="row"><div><input class="ep" type="number" inputmode="numeric" value="${escH(e.price)}" placeholder="새 가격"></div>
+          <div><button class="btn sub ei" style="padding:7px;font-size:14px">${e.image ? "✓ 새 대표사진" : "📷 대표사진 교체"}</button></div></div>
+          ${e.title === it.title ? '<div class="hint">💡 제목을 조금 바꾸면 새 상품으로 노출되기 좋아요</div>' : ""}
+        </div></div>`;
+    d.querySelector("input[type=checkbox]").onchange = ev => { e.sel = ev.target.checked; d.classList.toggle("sel", e.sel); renderCount(); };
+    d.querySelector(".et").oninput = ev => e.title = ev.target.value;
+    d.querySelector(".ep").oninput = ev => e.price = ev.target.value;
+    d.querySelector(".ei").onclick = () => { reImgTarget = it.code; $("reImgIn").click(); };
+    el.appendChild(d);
+  }
+}
+function renderCount() { $("candCount").textContent = `· 후보 ${candidates().length}개 / 선택 ${candidates().filter(i => edits[i.code]?.sel).length}개`; }
+$("selAll").onclick = () => { candidates().forEach(it => { (edits[it.code] ||= { title: it.title, price: it.price, image: "" }).sel = true; }); renderCands(); };
+$("selNone").onclick = () => { Object.values(edits).forEach(e => e.sel = false); renderCands(); };
+$("bulkApply").onclick = () => {
+  const pre = $("bulkPrefix").value.trim(), suf = $("bulkSuffix").value.trim(), pct = parseFloat($("bulkPct").value);
+  let n = 0;
+  for (const it of candidates()) {
+    const e = edits[it.code]; if (!e || !e.sel) continue; n++;
+    let t = it.title;
+    if (pre) t = pre + t.replace(/^\s*【[^】]*】\s*/, "");
+    if (suf && !t.endsWith(suf)) t = t + " " + suf;
+    e.title = t.slice(0, 100);
+    if (!isNaN(pct) && pct) e.price = String(Math.max(1, Math.round((+it.price || 0) * (1 + pct / 100))));
+  }
+  renderCands(); toast(n ? `${n}개 상품에 적용했어요` : "먼저 상품을 선택하세요");
+};
+$("reImgIn").onchange = async ev => {
+  const f = ev.target.files[0]; ev.target.value = ""; if (!f || !reImgTarget) return;
+  const blob = await compress(f, 1200);
+  edits[reImgTarget].imageBlob = blob; edits[reImgTarget].image = URL.createObjectURL(blob);
+  renderCands();
+};
+
+async function doRelist(dry) {
+  const sel = candidates().filter(it => edits[it.code]?.sel);
+  if (!sel.length) return toast("갈이할 상품을 선택하세요");
+  if (sel.length > 30) return toast("한 번에 30개까지 가능해요");
+  if (!dry && !confirm(`${sel.length}개 상품을 페이지 갈이할까요?\n기존 상품은 ${$("oldAction").value === "3" ? "거래폐지" : "판매중지"}되고 새 상품으로 등록돼요.`)) return;
+  const out = $("reResult"), lines = []; const step = s => { lines.push(s); out.innerHTML = `<div id="progress">${escH(lines.join("\n"))}</div>`; };
+  $("reDry").disabled = $("reRun").disabled = true;
+  try {
+    const items = [];
+    for (const it of sel) {
+      const e = edits[it.code], item = { code: it.code, seller_code: it.seller_code, qty: it.qty };
+      if (e.title && e.title !== it.title) item.new_title = e.title.trim();
+      if (e.price && String(e.price) !== String(it.price)) item.new_price = +e.price;
+      if (e.imageBlob && !dry) {
+        step(`📷 새 대표사진 업로드 (${it.code})`);
+        const p = `uploads/relist-${it.code}-${Date.now()}.jpg`;
+        await putFile(p, await blobB64(e.imageBlob), `relist photo ${it.code}`); item.new_image = rawUrl(p);
+      }
+      items.push(item);
+    }
+    step(dry ? "🔎 미리보기 요청 중… (1~2분)" : `🚀 ${items.length}개 페이지 갈이 요청 중… (상품당 몇 초씩)`);
+    const r = await runJob({ type: "relist", dry_run: dry, old_action: $("oldAction").value, items }, i => i % 4 === 3 && step("… 처리 중"));
+    if (!r.ok) throw new Error(r.error);
+    out.innerHTML = `<div class="hint">${dry ? "미리보기 — 실제로는 아무것도 바뀌지 않았어요" : `완료 ${r.success}개 · 실패 ${r.failed}개`} · ${escH(r.finished_at)}</div>` +
+      r.results.map(x => `<div class="job"><span class="st ${x.ok ? "ok" : "err"}">${x.ok ? (dry ? "OK" : "완료") : "실패"}</span><b>${escH(x.title || x.old_code)}</b>
+        <div class="hint">기존 ${escH(x.old_code)}${x.new_code ? " → 새 상품번호 " + escH(x.new_code) : ""}${x.new_seller_code ? " · 판매자코드 " + escH(x.new_seller_code) : ""}</div>
+        ${x.error ? `<div class="err-msg">${escH(x.error)}</div>` : ""}
+        ${(x.warnings || []).map(w => `<div class="err-msg">⚠️ ${escH(w)}</div>`).join("")}
+        ${x.preview ? `<details><summary>보낼 내용</summary><pre style="white-space:pre-wrap;font-size:12px">${escH(JSON.stringify(x.preview, null, 1))}</pre></details>` : ""}</div>`).join("");
+    if (!dry) { scanData.items = scanData.items.filter(it => !r.results.some(x => x.ok && x.old_code === it.code)); store.set("scan", scanData); renderCands(); }
+  } catch (e) { step("❌ " + e.message); }
+  finally { $("reDry").disabled = $("reRun").disabled = false; }
+}
+$("reDry").onclick = () => doRelist(true);
+$("reRun").onclick = () => doRelist(false);
+renderCands();
+
+loadLists(); refreshJobs();
+if (!cfg.token) setTimeout(() => { fillSettings(); $("settings").showModal(); }, 400);
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
