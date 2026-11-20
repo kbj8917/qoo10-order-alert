@@ -1,5 +1,5 @@
 // 앱 화면만 캐시 (네트워크 우선). GitHub API 요청은 캐시하지 않음.
-const C = "qoo10-app-v1";
+const C = "qoo10-app-v2";
 self.addEventListener("install", e => { e.waitUntil(caches.open(C).then(c => c.addAll(["./", "index.html", "manifest.json", "icon.svg"]))); self.skipWaiting(); });
 self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 self.addEventListener("fetch", e => {

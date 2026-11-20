@@ -4,6 +4,11 @@
   python qoo10_upload.py --job jobs/<id>.json   # 상품 등록
   python qoo10_upload.py --sync                  # 카테고리/배송비 목록 → docs/data/
 
+작업 파일(jobs/<id>.json)의 "type":
+  register (기본)  새 상품 등록
+  scan             판매중 상품 + 기간 내 판매수량 조회 → results/<id>.json
+  relist           페이지 갈이: 기존 상품 정보 복사 → 수정 → 기존 판매중지 → 새로 등록
+
 표준 라이브러리만 사용. 인증 정보는 qoo10_alert 와 동일한 환경변수/Secrets 사용:
   QOO10_SAK  또는  QOO10_API_KEY + QOO10_USER_ID + QOO10_PASSWORD
 """
@@ -82,6 +87,32 @@ def get_seller_key():
     return sak
 
 
+def field(o, *names, default=""):
+    """응답 필드명 대소문자/표기 차이를 흡수."""
+    if not isinstance(o, dict):
+        return default
+    low = {k.lower(): v for k, v in o.items()}
+    for n in names:
+        v = low.get(n.lower())
+        if v not in (None, ""):
+            return v
+    return default
+
+
+def as_list(obj):
+    """ResultObject 가 list / {Items:[...]} / dict 단일 등 여러 형태로 오는 것을 리스트로."""
+    if obj is None:
+        return []
+    if isinstance(obj, list):
+        return obj
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(v, list) and k.lower() in ("items", "item", "itemlist", "goods", "list", "data"):
+                return v
+        return [obj]
+    return []
+
+
 # ------------------------------------------------------------------ 상품 등록
 def build_description(job):
     """텍스트 설명 + 상세 이미지들을 HTML로 조합."""
@@ -152,23 +183,188 @@ def register(job, sak):
     return result
 
 
+# ------------------------------------------------------------------ 스캔 (판매 부진 상품 찾기)
+def list_items(sak, status="S2"):
+    """판매중(S2) 상품 전체 목록."""
+    items, page = [], 1
+    while page <= 200:
+        d = qapi("ItemsLookup.GetAllGoodsInfo", sak, ItemStatus=status, Page=page)
+        obj = d.get("ResultObject")
+        batch = as_list(obj)
+        if not batch:
+            break
+        for it in batch:
+            code = str(field(it, "ItemCode", "GdNo", "itemNo"))
+            if not code:
+                continue
+            items.append({
+                "code": code,
+                "seller_code": field(it, "SellerCode", "SellerItemCode"),
+                "title": field(it, "ItemTitle", "ItemName", "Title"),
+                "price": field(it, "ItemPrice", "SellPrice", "Price"),
+                "qty": field(it, "ItemQty", "Qty", "StockQty"),
+                "image": field(it, "ImageUrl", "StandardImage", "ItemImage"),
+                "reg_date": str(field(it, "RegDate", "RegistDate", "CreateDate", "StartDate"))[:10],
+                "status": field(it, "ItemStatus", "Status"),
+            })
+        total_pages = int(field(obj, "TotalPages", "TotalPage", default=0) or 0) if isinstance(obj, dict) else 0
+        if (total_pages and page >= total_pages) or (not total_pages and len(batch) < 100):
+            break
+        page += 1
+    return items
+
+
+def sales_by_item(sak, days):
+    """최근 days일 주문을 7일 단위로 나눠 조회 → {상품코드: 판매수량}."""
+    sold, seen = {}, set()
+    end = datetime.now(JST)
+    start = end - timedelta(days=days)
+    cur = start
+    while cur < end:
+        nxt = min(cur + timedelta(days=7), end)
+        for st in ("1", "2", "3", "4", "5"):
+            d = qapi("ShippingBasic.GetShippingInfo_v2", sak, ShippingStat=st,
+                     search_Sdate=cur.strftime("%Y%m%d"), search_Edate=nxt.strftime("%Y%m%d"), search_condition="1")
+            for o in as_list(d.get("ResultObject")):
+                key = (str(field(o, "orderNo", "OrderNo")), str(field(o, "packNo", "PackNo")))
+                if key in seen:
+                    continue
+                seen.add(key)
+                code = str(field(o, "itemCode", "ItemCode", "GdNo"))
+                if code:
+                    sold[code] = sold.get(code, 0) + int(float(field(o, "orderQty", "OrderQty", default=1) or 1))
+        cur = nxt + timedelta(days=1)
+    return sold
+
+
+def scan(job, sak):
+    days = int(job.get("days") or 30)
+    items = list_items(sak)
+    sold = sales_by_item(sak, days)
+    for it in items:
+        it["sold"] = sold.get(it["code"], 0)
+    return {"days": days, "items": items, "item_count": len(items), "sold_items": len(sold)}
+
+
+# ------------------------------------------------------------------ 페이지 갈이
+def item_detail(sak, code, seller_code=""):
+    d = qapi("ItemsLookup.GetItemDetailInfo", sak, ItemCode=code, SellerCode=seller_code or None)
+    lst = as_list(d.get("ResultObject"))
+    if not lst:
+        raise RuntimeError(f"상품 상세 조회 실패: {code}")
+    return lst[0]
+
+
+def set_status(sak, code, seller_code, status):
+    """status: 1=取引待機(판매중지) 2=取引可能(판매중) 3=取引廃止(거래폐지)"""
+    qapi("ItemsBasic.EditGoodsStatus", sak, ItemCode=code, SellerCode=seller_code or None, Status=status)
+
+
+def relist_one(sak, it, dry_run, old_action):
+    code = str(it["code"])
+    det = item_detail(sak, code, it.get("seller_code"))
+    old_seller = it.get("seller_code") or field(det, "SellerCode")
+    out = {"old_code": code, "warnings": []}
+
+    # 옵션 상품은 옵션이 복사되지 않으므로 기본적으로 제외
+    try:
+        od = qapi("ItemsLookup.GetGoodsOptionInfo", sak, ItemCode=code)
+        if as_list(od.get("ResultObject")) and not it.get("allow_options"):
+            raise RuntimeError("옵션이 있는 상품이라 자동 갈이에서 제외했어요 (옵션은 복사되지 않음)")
+    except RuntimeError as e:
+        if "옵션이 있는" in str(e):
+            raise
+        out["warnings"].append(f"옵션 확인 불가: {e}")
+
+    new_seller = it.get("new_seller_code") or f"{old_seller or code}-R{datetime.now(JST).strftime('%m%d')}"
+    job = {
+        "category": field(det, "SecondSubCat", "SecondSubCatCd", "CategoryCode", "SubCatCd", "CatCd"),
+        "brand_no": field(det, "BrandNo"),
+        "title": it.get("new_title") or field(det, "ItemTitle"),
+        "promotion": field(det, "PromotionName"),
+        "seller_code": new_seller,
+        "jan": field(det, "IndustrialCode", "JanCode"),
+        "origin_type": field(det, "ProductionPlaceType", default="2"),
+        "origin": field(det, "ProductionPlace", default="Korea"),
+        "weight": field(det, "Weight"),
+        "retail_price": field(det, "RetailPrice") or None,
+        "price": it.get("new_price") or field(det, "ItemPrice", "SellPrice"),
+        "qty": field(det, "ItemQty", "Qty", default=it.get("qty") or 100),
+        "expire_date": str(field(det, "ExpireDate", default="2099-12-31"))[:10],
+        "shipping_no": field(det, "ShippingNo", "ShippingGroupNo"),
+        "available_type": field(det, "AvailableDateType", default="0"),
+        "available_value": field(det, "AvailableDateValue", default="3"),
+        "adult": field(det, "AdultYN", default="N"),
+        "keyword": field(det, "Keyword", "SearchKeyword"),
+        "description": field(det, "ItemDescription", "ItemDetail", "Description", "ItemContents"),
+        "images": [u for u in [it.get("new_image") or field(det, "ImageUrl", "StandardImage")] if u]
+                  + list(it.get("extra_images") or []),
+        "extra": it.get("extra") or {},
+    }
+    out["new_seller_code"] = new_seller
+    out["title"] = job["title"]
+    if dry_run:
+        out["preview"] = {k: (v[:200] + "…" if isinstance(v, str) and len(v) > 200 else v) for k, v in job.items()}
+        out["detail_raw_keys"] = sorted(det.keys())
+        return out
+
+    # 1) 기존 상품 판매중지 (중복 출품 방지)  2) 새로 등록  3) 실패 시 기존 상품 복구
+    set_status(sak, code, old_seller, old_action)
+    try:
+        res = register(job, sak)
+    except Exception as e:
+        try:
+            set_status(sak, code, old_seller, "2")
+            note = "기존 상품은 다시 판매중으로 되돌렸어요"
+        except Exception as e2:
+            note = f"⚠️ 기존 상품 복구 실패! QSM에서 직접 판매중으로 바꿔주세요 ({e2})"
+        raise RuntimeError(f"새 등록 실패: {e} → {note}")
+    out["new_code"] = res.get("item_code")
+    out["warnings"] += res.get("warnings", [])
+    return out
+
+
+def relist(job, sak):
+    dry = bool(job.get("dry_run"))
+    action = str(job.get("old_action") or "1")
+    results = []
+    for it in (job.get("items") or [])[:30]:
+        try:
+            r = relist_one(sak, it, dry, action)
+            r["ok"] = True
+        except Exception as e:
+            r = {"old_code": it.get("code"), "title": it.get("new_title"), "ok": False, "error": str(e)}
+        results.append(r)
+    return {"dry_run": dry, "results": results,
+            "success": sum(r["ok"] for r in results), "failed": sum(not r["ok"] for r in results)}
+
+
 def run_job(path):
     job_id = os.path.splitext(os.path.basename(path))[0]
-    out = {"id": job_id, "finished_at": datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")}
+    out = {"id": job_id}
     try:
         with open(path, encoding="utf-8") as f:
             job = json.load(f)
-        out["title"] = job.get("title")
-        out.update(register(job, get_seller_key()))
+        kind = job.get("type", "register")
+        out["type"] = kind
+        sak = get_seller_key()
+        if kind == "scan":
+            out.update(scan(job, sak))
+        elif kind == "relist":
+            out.update(relist(job, sak))
+        else:
+            out["title"] = job.get("title")
+            out.update(register(job, sak))
         out["ok"] = True
     except Exception as e:
         out["ok"] = False
         out["error"] = str(e)
         traceback.print_exc()
+    out["finished_at"] = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
     os.makedirs("results", exist_ok=True)
     with open(f"results/{job_id}.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print(json.dumps({k: v for k, v in out.items() if k != "raw"}, ensure_ascii=False))
+    print(json.dumps({k: v for k, v in out.items() if k not in ("raw", "items")}, ensure_ascii=False)[:3000])
 
 
 # ------------------------------------------------------------------ 목록 동기화
