@@ -1,25 +1,14 @@
-name: Qoo10 order alert
-
 on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
-
 permissions:
   contents: write
-
-concurrency:
-  group: qoo10-alert
-  cancel-in-progress: false
-
 jobs:
-  check:
+  a:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check new orders
+      - run: python qoo10_alert.txt
         env:
-          SECRETS_JSON:${{ toJSON(secrets) }}
-        run: python -c "import json,os,runpy; os.environ.update({k:v for k,v in json.loads(os.environ['SECRETS_JSON']).items() if is
+          S: ${{ toJSON(secrets) }}
