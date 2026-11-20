@@ -1,0 +1,36 @@
+{
+ "brand":"ODDTYPE","brand_kana":"オッドタイプ",
+ "product_ja":"スナッグブラーティント","product_sub_ja":"ブラーリップティント","product_en":"SNUG BLUR TINT",
+ "category":"lip","thumb_style":"sell",
+ "badge":"ふんわり\nブラー","lead":"ふんわりぼかす、\nブラー質感ティント",
+ "hero_catch":"ふんわり、\nにじむように、\n唇に色づく。",
+ "hero_sub":"やわらかな\nブラー質感で\n今っぽい口元に。",
+ "points_title":"3つのポイント",
+ "points":[
+  {"title":"ブラー質感","desc":"輪郭をやわらかく\nぼかした仕上がり","icon":"feather"},
+  {"title":"全6色から選べる","desc":"気分やメイクに\n合わせて選べる","icon":"color"},
+  {"title":"丸みのあるボトル","desc":"シルバーキャップの\nコンパクトなデザイン","icon":"heart"}
+ ],
+ "features_title":"製品の特徴",
+ "features":[
+  {"title":"ブラー\n仕上げ","desc":"ふんわりとした\nやわらかな印象に"},
+  {"title":"全6色の\nカラー展開","desc":"デイリーから\nポイントメイクまで"},
+  {"title":"ティント\nタイプ","desc":"唇にすっと\n色づくティント"},
+  {"title":"持ち歩きやすい\nフォルム","desc":"丸みのある\nコンパクトボトル"}
+ ],
+ "layer_title":"薄くぼかしても、\n重ねてもかわいい。",
+ "layers":[
+  {"title":"ポンポンとぼかして","desc":"じゅわっとにじむ\nナチュラルな口元"},
+  {"title":"全体に重ねて","desc":"しっかり色づく\n印象的な口元"}
+ ],
+ "shades_title_en":"","shades_title_ja":"","groups":[],
+ "thumb_swatches":[{"label":"ローズ","hex":"#b9787b"},{"label":"ピンク","hex":"#cf6f8c"}],
+ "thumb_tags":["全6色"],
+ "howto_title_en":"HOW TO USE","howto_title_ja":"ご使用方法",
+ "howto":["唇の中央に\nのせます","指やチップで\nふんわりぼかします","お好みの濃さまで\n重ねて完成"],
+ "ingredients":[],
+ "lineup_title":"ラインナップ","spec":"全6色",
+ "closing":"いつもの口元に、\nやわらかなニュアンスを。","closing_en":"SOFT.\nBLURRY.\nEVERYDAY.",
+ "round_badge":"全6色\n展開",
+ "theme":{"bg":"#efe0dc","accent":"#b8767a","deep":"#3b2527"}
+}
