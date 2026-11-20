@@ -1,0 +1,27 @@
+name: Qoo10 order alert
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: qoo10-alert
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: seen_orders.json
+          key: qoo10-seen-${{ github.run_id }}
+          restore-keys: qoo10-seen-
+
+      - name: Check new orders
+        env:
+          QOO10_SAK: ${
