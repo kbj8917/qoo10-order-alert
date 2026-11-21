@@ -106,19 +106,63 @@ def fetch_orders(sak):
 
 
 # ---------------------------------------------------------------- 알림
+def translate_ja_to_ko(text):
+    """일본어 상품명/옵션을 한국어로 번역 (실패 시 빈 문자열 반환, 알림 누락 방지)."""
+    s = (text or "").strip()
+    if not s:
+        return ""
+    # 1) Google Translate gtx
+    try:
+        q = urllib.parse.urlencode({"client": "gtx", "sl": "ja", "tl": "ko", "dt": "t", "q": s})
+        req = urllib.request.Request(
+            f"https://translate.googleapis.com/translate_a/single?{q}",
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        out = "".join(seg[0] for seg in (data[0] or []) if seg and seg[0]).strip()
+        if out and out != s:
+            return out
+    except Exception:
+        pass
+    # 2) MyMemory 폴백
+    try:
+        q = urllib.parse.urlencode({"q": s[:450], "langpair": "ja|ko"})
+        req = urllib.request.Request(
+            f"https://api.mymemory.translated.net/get?{q}",
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        out = ((data.get("responseData") or {}).get("translatedText") or "").strip()
+        if out and out != s:
+            return out
+    except Exception:
+        pass
+    return ""
+
+
 def format_order(o):
     title = field(o, "itemTitle", "ItemTitle")
     opt = field(o, "option", "Option", "optionCode")
     qty = field(o, "orderQty", "OrderQty")
     total = field(o, "total", "Total", "orderPrice", "OrderPrice")
+    title_ko = translate_ja_to_ko(title)
+    opt_ko = translate_ja_to_ko(opt) if opt else ""
     lines = [
         "🛒 Qoo10 신규 주문!",
         f"주문번호: {field(o, 'orderNo', 'OrderNo')}",
         f"주문일시: {field(o, 'orderDate', 'OrderDate')}",
-        f"상품: {title}",
+        f"상품(한글): {title_ko}" if title_ko else f"상품: {title}",
     ]
+    if title_ko:
+        lines.append(f"상품(원문): {title}")
     if opt:
-        lines.append(f"옵션: {opt}")
+        if opt_ko:
+            lines.append(f"옵션(한글): {opt_ko}")
+            lines.append(f"옵션(원문): {opt}")
+        else:
+            lines.append(f"옵션: {opt}")
     lines.append(f"수량: {qty}")
     if total:
         lines.append(f"금액: ¥{total}")
