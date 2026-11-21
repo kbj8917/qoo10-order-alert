@@ -218,36 +218,44 @@ def log(msg):
 
 
 def format_summary(new_orders, total_orders_count):
-    """신규 주문들을 상품별로 묶어 '이 상품 N건(M개)' 요약 메시지를 생성."""
+    """신규 주문들을 상품·옵션별로 묶어 발주 수량을 한눈에 보기 쉽게 정리."""
     groups = {}
     order_seq = []
     for o in new_orders:
         code = str(field(o, "itemCode", "ItemCode") or "").strip()
         title = str(field(o, "itemTitle", "ItemTitle") or "").strip()
+        opt = str(field(o, "option", "Option", "optionCode") or "").strip()
         key = code or title or "상품"
         if key not in groups:
-            groups[key] = {"title": title, "count": 0, "qty": 0}
+            groups[key] = {"title": title, "count": 0, "qty": 0, "opts": {}, "opt_seq": []}
             order_seq.append(key)
-        groups[key]["count"] += 1
+        g = groups[key]
+        g["count"] += 1
         try:
             q = int(field(o, "orderQty", "OrderQty", default=1) or 1)
         except (TypeError, ValueError):
             q = 1
-        groups[key]["qty"] += q
+        g["qty"] += q
+        if opt:
+            if opt not in g["opts"]:
+                g["opts"][opt] = 0
+                g["opt_seq"].append(opt)
+            g["opts"][opt] += q
 
     total_qty = sum(g["qty"] for g in groups.values())
     lines = [
-        f"🔔 Qoo10 신규 주문 {len(new_orders)}건 (총 {total_qty}개) / 현재 미처리 {total_orders_count}건",
+        f"📦 Qoo10 신규 {len(new_orders)}건 / 발주 총 {total_qty}개 (미처리 {total_orders_count}건)",
         "",
     ]
     for key in order_seq:
         g = groups[key]
         title_ko = translate_ja_to_ko(g["title"])
         name = title_ko or g["title"]
-        if g["qty"] != g["count"]:
-            lines.append(f"• {name} — {g['count']}건 (수량 {g['qty']}개)")
-        else:
-            lines.append(f"• {name} — {g['count']}개 신규주문")
+        lines.append(f"• {name} — {g['qty']}개 발주")
+        for opt in g["opt_seq"]:
+            opt_ko = translate_ja_to_ko(opt)
+            opt_label = opt_ko or opt
+            lines.append(f"  └ {opt_label}: {g['opts'][opt]}개")
     return "\n".join(lines)
 
 
