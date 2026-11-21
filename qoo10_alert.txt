@@ -142,15 +142,50 @@ def translate_ja_to_ko(text):
     return ""
 
 
-def format_order(o):
+def _bundle_key(o):
+    pack = str(field(o, "packNo", "PackNo") or "").strip()
+    if pack and pack != "0":
+        return f"pack:{pack}", f"장바구니 {pack}"
+    buyer = str(field(o, "buyer", "Buyer") or "").strip()
+    recv = str(field(o, "receiver", "Receiver", "receiverName", "ReceiverName") or "").strip()
+    if buyer and recv:
+        return f"person:{buyer}|{recv}", f"{buyer} / {recv}"
+    if buyer:
+        return f"buyer:{buyer}", buyer
+    return "", ""
+
+
+def find_combined_map(new_orders, all_orders):
+    """전체 미처리 주문 중 같은 장바구니(packNo) 또는 동일 구매자/수령인 2건 이상 합배송 탐지."""
+    buckets = {}
+    labels = {}
+    for o in all_orders.values():
+        k, lbl = _bundle_key(o)
+        if not k:
+            continue
+        buckets.setdefault(k, []).append(str(field(o, "orderNo", "OrderNo")))
+        labels[k] = lbl
+    new_nos = {str(field(o, "orderNo", "OrderNo")) for o in new_orders}
+    order_bundle = {}
+    summary_lines = []
+    for k, nos in buckets.items():
+        if len(nos) >= 2 and any(n in new_nos for n in nos):
+            for n in nos:
+                order_bundle[n] = len(nos)
+            summary_lines.append(f"  • {labels[k]} — {len(nos)}건 ({', '.join(nos)})")
+    return order_bundle, summary_lines
+
+
+def format_order(o, bundle_count=0):
     title = field(o, "itemTitle", "ItemTitle")
     opt = field(o, "option", "Option", "optionCode")
     qty = field(o, "orderQty", "OrderQty")
     total = field(o, "total", "Total", "orderPrice", "OrderPrice")
     title_ko = translate_ja_to_ko(title)
     opt_ko = translate_ja_to_ko(opt) if opt else ""
+    header = f"🛒 Qoo10 신규 주문! 📮[합배송 {bundle_count}건]" if bundle_count >= 2 else "🛒 Qoo10 신규 주문!"
     lines = [
-        "🛒 Qoo10 신규 주문!",
+        header,
         f"주문번호: {field(o, 'orderNo', 'OrderNo')}",
         f"주문일시: {field(o, 'orderDate', 'OrderDate')}",
         f"상품(한글): {title_ko}" if title_ko else f"상품: {title}",
@@ -217,7 +252,7 @@ def log(msg):
         print(msg)
 
 
-def format_summary(new_orders, total_orders_count):
+def format_summary(new_orders, total_orders_count, bundle_lines=None):
     """신규 주문들을 상품·옵션별로 묶어 발주 수량을 한눈에 보기 쉽게 정리."""
     groups = {}
     order_seq = []
@@ -256,6 +291,10 @@ def format_summary(new_orders, total_orders_count):
             opt_ko = translate_ja_to_ko(opt)
             opt_label = opt_ko or opt
             lines.append(f"  └ {opt_label}: {g['opts'][opt]}개")
+    if bundle_lines:
+        lines.append("")
+        lines.append("📮 합배송(묶음) 있음:")
+        lines.extend(bundle_lines)
     return "\n".join(lines)
 
 
@@ -274,10 +313,12 @@ def check_once(sak):
     new = [o for no, o in orders.items() if no not in seen]
     if new:
         sorted_new = sorted(new, key=lambda x: str(field(x, "orderDate", "OrderDate")))
-        notify(format_summary(sorted_new, len(orders)))
+        order_bundle, bundle_lines = find_combined_map(sorted_new, orders)
+        notify(format_summary(sorted_new, len(orders), bundle_lines=bundle_lines))
         for o in sorted_new:
-            notify(format_order(o))
-            state["seen"].append(str(field(o, "orderNo", "OrderNo")))
+            no = str(field(o, "orderNo", "OrderNo"))
+            notify(format_order(o, bundle_count=order_bundle.get(no, 0)))
+            state["seen"].append(no)
     save_state(path, state)
     log(f"[{now}] 조회 {len(orders)}건 / 신규 {len(new)}건")
 
