@@ -218,18 +218,54 @@ def post(url, payload, as_json=False):
         return r.read()
 
 
-def notify(text):
+def fetch_item_image(sak, item_code, cache=None):
+    """Qoo10 상품번호로 대표이미지 URL 조회 (캐시 사용, 실패 시 빈 문자열 반환)."""
+    code = str(item_code or "").strip()
+    if not code:
+        return ""
+    if cache is not None and code in cache:
+        return cache[code]
+    url = ""
+    try:
+        data = qapi("ItemsLookup.GetItemDetailInfo", sak, ItemCode=code)
+        ro = data.get("ResultObject")
+        if isinstance(ro, list) and ro:
+            ro = ro[0]
+        if isinstance(ro, dict):
+            raw = str(field(ro, "ImageUrl", "imageUrl", "MainImageUrl", "ItemImageUrl") or "").strip()
+            if raw:
+                url = raw.split(",")[0].strip()
+                if url.startswith("http://"):
+                    url = "https://" + url[7:]
+    except Exception:
+        url = ""
+    if cache is not None:
+        cache[code] = url
+    return url
+
+
+def notify(text, photo_url=""):
     sent = False
     tok, chat = env("TELEGRAM_BOT_TOKEN"), env("TELEGRAM_CHAT_ID")
     if tok and chat:
-        post(f"https://api.telegram.org/bot{tok}/sendMessage", {"chat_id": chat, "text": text})
+        photo_sent = False
+        if photo_url and len(text) <= 1024:
+            try:
+                post(f"https://api.telegram.org/bot{tok}/sendPhoto", {"chat_id": chat, "photo": photo_url, "caption": text})
+                photo_sent = True
+            except Exception:
+                photo_sent = False
+        if not photo_sent:
+            post(f"https://api.telegram.org/bot{tok}/sendMessage", {"chat_id": chat, "text": text})
         sent = True
     hook = env("DISCORD_WEBHOOK_URL")
     if hook:
-        post(hook, {"content": text}, as_json=True)
+        content = f"{text}\n{photo_url}" if photo_url else text
+        post(hook, {"content": content}, as_json=True)
         sent = True
     if not sent:
-        print("[알림 채널 미설정] " + text.replace("\n", " | "))
+        prefix = f"[사진: {photo_url}] " if photo_url else ""
+        print("[알림 채널 미설정] " + prefix + text.replace("\n", " | "))
 
 
 # ---------------------------------------------------------------- 상태 저장
@@ -355,9 +391,12 @@ def check_once(sak):
         order_bundle, bundle_lines = find_combined_map(sorted_new, orders)
         warn_nos = find_delay_warnings(orders)
         notify(format_summary(sorted_new, len(orders), bundle_lines=bundle_lines, warn_nos=warn_nos))
+        img_cache = {}
         for o in sorted_new:
             no = str(field(o, "orderNo", "OrderNo"))
-            notify(format_order(o, bundle_count=order_bundle.get(no, 0)))
+            item_code = str(field(o, "itemCode", "ItemCode") or "").strip()
+            img_url = fetch_item_image(sak, item_code, cache=img_cache) if item_code else ""
+            notify(format_order(o, bundle_count=order_bundle.get(no, 0)), photo_url=img_url)
             state["seen"].append(no)
     save_state(path, state)
     log(f"[{now}] 조회 {len(orders)}건 / 신규 {len(new)}건")
