@@ -252,7 +252,41 @@ def log(msg):
         print(msg)
 
 
-def format_summary(new_orders, total_orders_count, bundle_lines=None):
+def _parse_dt(val):
+    s = str(val or "").strip()
+    if not s:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y/%m/%d %H:%M:%S", "%Y/%m/%d", "%Y%m%d"):
+        try:
+            return datetime.strptime(s[:19], fmt).replace(tzinfo=JST)
+        except ValueError:
+            continue
+    return None
+
+
+def find_delay_warnings(all_orders, now_jst=None):
+    """배송요청(상태 2) 중 발송예정일 임박/경과 또는 주문 후 48시간 이상 경과한 주의 건 탐지."""
+    now = now_jst or datetime.now(JST)
+    today_date = now.date()
+    warn_nos = []
+    for o in all_orders.values():
+        if str(o.get("_status") or "") != "2":
+            continue
+        no = str(field(o, "orderNo", "OrderNo") or "").strip()
+        if not no:
+            continue
+        est = _parse_dt(field(o, "estShippingDate", "EstShippingDate", "shippingDate", "ShippingDate"))
+        if est is not None:
+            if est.date() <= today_date:
+                warn_nos.append(no)
+            continue
+        odt = _parse_dt(field(o, "orderDate", "OrderDate", "paymentDate", "PaymentDate"))
+        if odt is not None and (now - odt) >= timedelta(hours=48):
+            warn_nos.append(no)
+    return warn_nos
+
+
+def format_summary(new_orders, total_orders_count, bundle_lines=None, warn_nos=None):
     """신규 주문들을 상품·옵션별로 묶어 발주 수량을 한눈에 보기 쉽게 정리."""
     groups = {}
     order_seq = []
@@ -278,8 +312,9 @@ def format_summary(new_orders, total_orders_count, bundle_lines=None):
             g["opts"][opt] += q
 
     total_qty = sum(g["qty"] for g in groups.values())
+    warn_list = warn_nos or []
     lines = [
-        f"📦 Qoo10 신규 {len(new_orders)}건 / 발주 총 {total_qty}개 (미처리 {total_orders_count}건)",
+        f"📦 Qoo10 신규 {len(new_orders)}건 / 발주 총 {total_qty}개 (미처리 {total_orders_count}건 · 주의 {len(warn_list)}건)",
         "",
     ]
     for key in order_seq:
@@ -295,6 +330,10 @@ def format_summary(new_orders, total_orders_count, bundle_lines=None):
         lines.append("")
         lines.append("📮 합배송(묶음) 있음:")
         lines.extend(bundle_lines)
+    if warn_list:
+        lines.append("")
+        shown = ", ".join(warn_list[:10]) + (" 외" if len(warn_list) > 10 else "")
+        lines.append(f"⚠️ 발송지연 주의 {len(warn_list)}건: {shown}")
     return "\n".join(lines)
 
 
@@ -314,7 +353,8 @@ def check_once(sak):
     if new:
         sorted_new = sorted(new, key=lambda x: str(field(x, "orderDate", "OrderDate")))
         order_bundle, bundle_lines = find_combined_map(sorted_new, orders)
-        notify(format_summary(sorted_new, len(orders), bundle_lines=bundle_lines))
+        warn_nos = find_delay_warnings(orders)
+        notify(format_summary(sorted_new, len(orders), bundle_lines=bundle_lines, warn_nos=warn_nos))
         for o in sorted_new:
             no = str(field(o, "orderNo", "OrderNo"))
             notify(format_order(o, bundle_count=order_bundle.get(no, 0)))
